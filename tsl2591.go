@@ -1,18 +1,16 @@
-/**
- * tsl2591 - Package for interacting with TSL2591 lux sensors.
- *
- * Mostly ported from Adafruit's library here:
- * https://github.com/adafruit/Adafruit_TSL2591_Library
- */
+//Package tsl2591 interacts with TSL2591 lux sensors
 package tsl2591
 
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"math"
 	"time"
 
-	"golang.org/x/exp/io/i2c"
+	"periph.io/x/periph/conn/i2c"
+	"periph.io/x/periph/conn/i2c/i2creg"
+	"periph.io/x/periph/host"
 )
 
 // General purpose consts
@@ -105,6 +103,7 @@ const (
 	TSL2591_GAIN_MAX  byte = 0x30 /// max gain (9876x)
 )
 
+// Opts holds various configuration options for the sensor
 type Opts struct {
 	Gain   byte
 	Timing byte
@@ -114,90 +113,139 @@ type TSL2591 struct {
 	enabled bool
 	timing  byte
 	gain    byte
-	dev     *i2c.Device
+	dev     i2c.Dev
 }
 
-// Begin sets up a TSL2591 chip via the I2C protocol, sets its gain and timing
+// NewTSL2591 sets up a TSL2591 chip via the I2C protocol, sets its gain and timing
 // attributes, and returns an error if any occurred in that process or if the
 // TSL2591 was not found.
 func NewTSL2591(opts *Opts) (*TSL2591, error) {
-	device, err := i2c.Open(&i2c.Devfs{Dev: "/dev/i2c-1"}, int(TSL2591_ADDR))
+
+	// Make sure periph is initialized.
+	if _, err := host.Init(); err != nil {
+		return nil, err
+	}
+
+	// Open the first available I²C bus:
+	bus, err := i2creg.Open("")
 	if err != nil {
 		return nil, err
 	}
 
+	// Address the device with address TSL2591_ADDR on the I²C bus:
+	dev := i2c.Dev{Addr: TSL2591_ADDR, Bus: bus}
 	tsl := &TSL2591{
-		dev: device,
+		dev: dev,
 	}
 
 	// Read the device ID from the TSL2591. It should be 0x50
-	buf := make([]byte, 1)
-	err = tsl.dev.ReadReg(TSL2591_COMMAND_BIT|TSL2591_REGISTER_DEVICE_ID, buf)
+	write := []byte{TSL2591_COMMAND_BIT | TSL2591_REGISTER_DEVICE_ID}
+	read := make([]byte, 1)
+	if err := tsl.dev.Tx(write, read); err != nil {
+		return nil, err
+	}
+	if read[0] != 0x50 {
+		fmt.Printf("%v\n", read)
+		return nil, errors.New("can't find a TSL2591 on I2C bus /dev/i2c-1")
+	}
+
+	err = tsl.SetTiming(opts.Timing)
 	if err != nil {
 		return nil, err
 	}
-	if buf[0] != 0x50 {
-		return nil, errors.New("Can't find a TSL2591 on I2C bus /dev/i2c-1")
+
+	err = tsl.SetGain(opts.Gain)
+	if err != nil {
+		return nil, err
 	}
 
-	tsl.SetTiming(opts.Timing)
-	tsl.SetGain(opts.Gain)
-
-	tsl.Disable()
+	err = tsl.Disable()
+	if err != nil {
+		return nil, err
+	}
 
 	return tsl, nil
 }
 
-func (tsl *TSL2591) Enable() {
-	var write []byte = []byte{
-		TSL2591_ENABLE_POWERON | TSL2591_ENABLE_AEN | TSL2591_ENABLE_AIEN | TSL2591_ENABLE_NPIEN,
+// Enable enables the TSL2591 chip
+func (tsl *TSL2591) Enable() error {
+
+	write := []byte{TSL2591_COMMAND_BIT | TSL2591_REGISTER_ENABLE |
+		TSL2591_ENABLE_POWERON | TSL2591_ENABLE_AEN |
+		TSL2591_ENABLE_AIEN | TSL2591_ENABLE_NPIEN}
+	if _, err := tsl.dev.Write(write); err != nil {
+		return err
 	}
-	if err := tsl.dev.WriteReg(TSL2591_COMMAND_BIT|TSL2591_REGISTER_ENABLE, write); err != nil {
-		panic(err)
-	}
+
 	tsl.enabled = true
+	return nil
 }
 
-func (tsl *TSL2591) Disable() {
-	var write []byte = []byte{
-		TSL2591_ENABLE_POWEROFF,
+// Disable disables the TSL2591 chip
+func (tsl *TSL2591) Disable() error {
+
+	write := []byte{TSL2591_COMMAND_BIT | TSL2591_REGISTER_ENABLE |
+		TSL2591_ENABLE_POWEROFF}
+	if _, err := tsl.dev.Write(write); err != nil {
+		return err
 	}
-	if err := tsl.dev.WriteReg(TSL2591_COMMAND_BIT|TSL2591_REGISTER_ENABLE, write); err != nil {
-		panic(err)
-	}
+
 	tsl.enabled = false
+	return nil
+
 }
 
-func (tsl *TSL2591) SetGain(gain byte) {
-	tsl.Enable()
+// SetGain sets TSL2591 gain. Chip is enabled, gain set, then disabled
+func (tsl *TSL2591) SetGain(gain byte) error {
 
-	write := []byte{
-		tsl.timing | gain,
-	}
-	if err := tsl.dev.WriteReg(TSL2591_COMMAND_BIT|TSL2591_REGISTER_CONTROL, write); err != nil {
-		panic(err)
+	err := tsl.Enable()
+	if err != nil {
+		return err
 	}
 
-	tsl.Disable()
+	write := []byte{TSL2591_COMMAND_BIT | TSL2591_REGISTER_ENABLE |
+		tsl.timing | gain}
+	if _, err := tsl.dev.Write(write); err != nil {
+		return err
+	}
+
+	err = tsl.Disable()
+	if err != nil {
+		return err
+	}
+
 	tsl.gain = gain
+
+	return nil
 }
 
-func (tsl *TSL2591) SetTiming(timing byte) {
-	tsl.Enable()
-
-	write := []byte{
-		timing | tsl.gain,
-	}
-	if err := tsl.dev.WriteReg(TSL2591_COMMAND_BIT|TSL2591_REGISTER_CONTROL, write); err != nil {
-		panic(err)
+// SetTiming sets TSL2591 timing. Chip is enabled, timing set, then disabled
+func (tsl *TSL2591) SetTiming(timing byte) error {
+	err := tsl.Enable()
+	if err != nil {
+		return err
 	}
 
-	tsl.Disable()
+	write := []byte{TSL2591_COMMAND_BIT | TSL2591_REGISTER_ENABLE |
+		timing | tsl.gain}
+	if _, err := tsl.dev.Write(write); err != nil {
+		return err
+	}
+
+	err = tsl.Disable()
+	if err != nil {
+		return err
+	}
 	tsl.timing = timing
+	return nil
 }
 
-func (tsl *TSL2591) GetFullLuminosity() (uint16, uint16) {
-	tsl.Enable()
+// GetFullLuminosity returns both visible and IR channel luminosity
+func (tsl *TSL2591) GetFullLuminosity() (uint16, uint16, error) {
+	err := tsl.Enable()
+	if err != nil {
+		return 0, 0, err
+	}
 
 	// Delay for ADC to complete
 	for d := byte(0); d < tsl.timing; d++ {
@@ -206,19 +254,23 @@ func (tsl *TSL2591) GetFullLuminosity() (uint16, uint16) {
 
 	bytes := make([]byte, 4)
 
-	err := tsl.dev.ReadReg(TSL2591_COMMAND_BIT|TSL2591_REGISTER_CHAN0_LOW, bytes)
-	if err != nil {
-		panic(err)
+	write := []byte{TSL2591_COMMAND_BIT | TSL2591_REGISTER_CHAN0_LOW}
+	if err := tsl.dev.Tx(write, bytes); err != nil {
+		return 0, 0, err
 	}
 
 	channel0 := binary.LittleEndian.Uint16(bytes[0:])
 	channel1 := binary.LittleEndian.Uint16(bytes[2:])
 
-	tsl.Disable()
+	err = tsl.Disable()
+	if err != nil {
+		return 0, 0, err
+	}
 
-	return channel0, channel1
+	return channel0, channel1, nil
 }
 
+// CalculateLux calculates lux from the provided intensities
 func (tsl *TSL2591) CalculateLux(ch0, ch1 uint16) float64 {
 	var (
 		atime float64

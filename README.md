@@ -1,3 +1,34 @@
+// TODO JIM YOU ARE HERE
+I think our starting code had the wrong size for visible light - should be 32-bit, same for full spectrum?
+
+// Python
+Total light: 0.762688lux
+Infrared light: 14
+Visible light: 917541
+Full spectrum (IR + visible) light: 917555
+Total light: 0.762688lux
+Infrared light: 14
+Visible light: 917541
+Full spectrum (IR + visible) light: 917555
+Total light: 0.762688lux
+Infrared light: 14
+Visible light: 917541
+Full spectrum (IR + visible) light: 917555
+
+// Go
+Total Light: 18.253333 lux
+Visible: 51
+Infrared: 14
+Total Light: 18.253333 lux
+Visible: 51
+Infrared: 14
+Total Light: 18.253333 lux
+Visible: 51
+Infrared: 14
+Total Light: 18.253333 lux
+Visible: 51
+Infrared: 14
+
 This is a Golang driver for the TSL2591 lux sensor.
 
 ## Installation
