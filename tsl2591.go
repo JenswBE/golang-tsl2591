@@ -243,5 +243,4 @@ func (tsl *TSL2591) Lux() (float64, error) {
 	lux2 := ((TSL2591_LUX_COEFC * float64(c0)) - (TSL2591_LUX_COEFD * float64(c1))) / cpl
 
 	return math.Max(lux1, lux2), nil
-
 }
