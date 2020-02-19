@@ -20,6 +20,8 @@ const (
 	TSL2591_LUX_COEFB       float64 = 1.64  // CH0 coefficient
 	TSL2591_LUX_COEFC       float64 = 0.59  // CH1 coefficient A
 	TSL2591_LUX_COEFD       float64 = 0.86  // CH2 coefficient B
+	TSL2591_MAX_COUNT_100MS uint16  = 0x8FFF
+	TSL2591_MAX_COUNT       uint16  = 0xFFFF
 )
 
 // TSL2591 Register map

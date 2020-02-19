@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"time"
 
 	"periph.io/x/periph/conn/i2c"
 	"periph.io/x/periph/conn/i2c/i2creg"
@@ -70,7 +69,7 @@ func NewTSL2591(opts *Opts) (*TSL2591, error) {
 		return nil, err
 	}
 
-	err = tsl.Disable()
+	err = tsl.Enable()
 	if err != nil {
 		return nil, err
 	}
@@ -151,83 +150,98 @@ func (tsl *TSL2591) SetTiming(timing byte) error {
 	return nil
 }
 
-// GetFullLuminosity returns both visible and IR channel luminosity
-func (tsl *TSL2591) GetFullLuminosity() (uint16, uint16, error) {
-	err := tsl.Enable()
-	if err != nil {
-		return 0, 0, err
+// Read a 16-bit little-endian unsigned value from the specified 8-bit address
+func (tsl *TSL2591) readU16(address byte) (uint16, error) {
+	readBuffer := make([]byte, 2)
+	cmd := []byte{TSL2591_COMMAND_BIT | address}
+	if err := tsl.dev.Tx(cmd, readBuffer); err != nil {
+		return 0, err
 	}
-
-	// Delay for ADC to complete
-	for d := byte(0); d < tsl.timing; d++ {
-		time.Sleep(120 * time.Millisecond)
-	}
-
-	bytes := make([]byte, 4)
-
-	write := []byte{TSL2591_COMMAND_BIT | TSL2591_REGISTER_CHAN0_LOW}
-	if err := tsl.dev.Tx(write, bytes); err != nil {
-		return 0, 0, err
-	}
-
-	channel0 := binary.LittleEndian.Uint16(bytes[0:])
-	channel1 := binary.LittleEndian.Uint16(bytes[2:])
-
-	err = tsl.Disable()
-	if err != nil {
-		return 0, 0, err
-	}
-
-	return channel0, channel1, nil
+	return binary.LittleEndian.Uint16(readBuffer), nil
 }
 
-// CalculateLux calculates lux from the provided intensities
-func (tsl *TSL2591) CalculateLux(ch0, ch1 uint16) float64 {
-	var (
-		atime float64
-		again float64
-
-		cpl float64
-		lux float64
-	)
-
-	// Return +Inf for overflow
-	if ch0 == 0xFFFF || ch1 == 0xFFFF {
-		return math.Inf(1)
+// RawLuminosity reads from the sensor
+func (tsl *TSL2591) RawLuminosity() (uint16, uint16, error) {
+	// The first value is IR + visible luminosity (channel 0)
+	// and the second is the IR only (channel 1). Both values
+	// are 16-bit unsigned numbers (0-65535)
+	c0, err := tsl.readU16(TSL2591_REGISTER_CHAN0_LOW)
+	if err != nil {
+		return 0, 0, err
 	}
 
-	switch tsl.timing {
-	case TSL2591_INTEGRATIONTIME_100MS:
-		atime = 100.0
-	case TSL2591_INTEGRATIONTIME_200MS:
-		atime = 200.0
-	case TSL2591_INTEGRATIONTIME_300MS:
-		atime = 300.0
-	case TSL2591_INTEGRATIONTIME_400MS:
-		atime = 400.0
-	case TSL2591_INTEGRATIONTIME_500MS:
-		atime = 500.0
-	case TSL2591_INTEGRATIONTIME_600MS:
-		atime = 600.0
-	default:
-		atime = 100.0
+	c1, err := tsl.readU16(TSL2591_REGISTER_CHAN1_LOW)
+	if err != nil {
+		return 0, 0, err
 	}
 
-	switch tsl.gain {
-	case TSL2591_GAIN_LOW:
-		again = 1.0
-	case TSL2591_GAIN_MED:
-		again = 25.0
-	case TSL2591_GAIN_HIGH:
-		again = 428.0
-	case TSL2591_GAIN_MAX:
-		again = 9876.0
-	default:
-		again = 1.0
+	return c0, c1, nil
+}
+
+// FullSpectrum returns the full spectrum value
+func (tsl *TSL2591) FullSpectrum() (uint32, error) {
+	// Full spectrum (IR + visible) light and return its value
+	// as a 32-bit unsigned number
+
+	c0, c1, err := tsl.RawLuminosity()
+	if err != nil {
+		return 0, nil
 	}
 
-	cpl = (atime * again) / TSL2591_LUX_DF
-	lux = (float64(ch0) - float64(ch1)) * (1.0 - (float64(ch1) / float64(ch0))) / cpl
+	return uint32(c1)<<16 | uint32(c0), nil
 
-	return lux
+}
+
+// Infrared returns infrared value
+func (tsl *TSL2591) Infrared() (uint16, error) {
+	_, c1, err := tsl.RawLuminosity()
+	if err != nil {
+		return 0, nil
+	}
+	return c1, nil
+}
+
+// Visible returns visible value
+func (tsl *TSL2591) Visible() (uint32, error) {
+	_, c1, err := tsl.RawLuminosity()
+	if err != nil {
+		return 0, nil
+	}
+	full := uint32(c1)<<16 | uint32(c1)
+	return full - uint32(c1), nil
+}
+
+// Lux calculates a lux value from both the infrared and visible channels
+func (tsl *TSL2591) Lux() (float64, error) {
+
+	c0, c1, err := tsl.RawLuminosity()
+	if err != nil {
+		return 0, nil
+	}
+
+	// Compute the atime in milliseconds
+	atime := 100.0*tsl.timing + 100.0
+
+	// Set the maximum sensor counts based on the integration time (atime) setting
+	var maxCounts uint16
+	if tsl.timing == TSL2591_INTEGRATIONTIME_100MS {
+		maxCounts = TSL2591_MAX_COUNT_100MS
+	} else {
+		maxCounts = TSL2591_MAX_COUNT
+	}
+
+	// Handle overflow.
+	if c0 >= maxCounts || c1 >= maxCounts {
+		return 0, errors.New("overflow reading light channels")
+	}
+
+	// Calculate lux
+	// https://github.com/adafruit/Adafruit_TSL2591_Library/blob/master/Adafruit_TSL2591.cpp
+	again := uint16(tsl.gain)
+	cpl := float64((uint16(atime) * again)) / TSL2591_LUX_DF
+	lux1 := (float64(c0) - (TSL2591_LUX_COEFB * float64(c1))) / cpl
+	lux2 := ((TSL2591_LUX_COEFC * float64(c0)) - (TSL2591_LUX_COEFD * float64(c1))) / cpl
+
+	return math.Max(lux1, lux2), nil
+
 }

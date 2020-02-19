@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/jimnelson2/tsl2591"
@@ -23,19 +24,37 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer tsl.Disable()
 
 	fmt.Println("finish")
 
 	ticker := time.NewTicker(Interval)
 
 	for {
-		channel0, channel1, err := tsl.GetFullLuminosity()
+		lux, err := tsl.Lux()
 		if err != nil {
-			fmt.Println(err)
+			log.Panic(err)
 		}
-		fmt.Printf("Total Light: %f lux\n", tsl.CalculateLux(channel0, channel1))
-		fmt.Printf("Visible: %d\n", channel0)
-		fmt.Printf("Infrared: %d\n", channel1)
+		fmt.Printf("Total Light: %f lux\n", lux)
+
+		ir, err := tsl.Infrared()
+		if err != nil {
+			log.Panic(err)
+		}
+		fmt.Printf("Infrared light: %d\n", ir)
+
+		visible, err := tsl.Visible()
+		if err != nil {
+			log.Panic(err)
+		}
+		fmt.Printf("Visible light: %d\n", visible)
+
+		full, err := tsl.FullSpectrum()
+		if err != nil {
+			log.Panic(err)
+		}
+		fmt.Printf("Full spectrum (IR + visible) light: %d\n", full)
+
 		<-ticker.C
 	}
 
