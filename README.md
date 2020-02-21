@@ -18,7 +18,7 @@ Note this module does NOT provide FULL control of the tsl2581, i.e. interrupts a
 * read visible, IR, and full spectrum
 * calculate lux
 
-If anyone would like to implement missing functionality, or discovers problems with what's here - I sure there are problems somewhere - please submit and issue or even better, a PR.
+If anyone would like to implement missing functionality, or discovers problems with what's here - I'm sure there are problems somewhere - please submit and issue or even better, a PR.
 
 ## Example Usage
 
@@ -27,17 +27,17 @@ Import this module and retrieve a lux value, e.g.
 ```go
 import ("github.com/jimnelson2/tsl2591")
 
-    // connect the the tsl2591
-	tsl, err := tsl2591.NewTSL2591(&tsl2591.Opts{
-		Gain:   tsl2591.GainMed,
-		Timing: tsl2591.Integrationtime600MS,
-	})
-	if err != nil {
-		panic(err)
-	}
+// connect the the tsl2591
+tsl, err := tsl2591.NewTSL2591(&tsl2591.Opts{
+	Gain:   tsl2591.GainMed,
+	Timing: tsl2591.Integrationtime600MS,
+})
+if err != nil {
+	panic(err)
+}
 
-	// read lux
-	lux, _ := tsl.Lux()
+// read lux
+lux, _ := tsl.Lux()
 ```
 
 ## Sample code
