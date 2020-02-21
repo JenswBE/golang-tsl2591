@@ -54,9 +54,13 @@ const (
 	LuxCoefC float64 = 0.59
 
 	// LuxCoefD is channel2 coefficient B
-	LuxCoefD      float64 = 0.86
-	MaxCount100ms uint16  = 0x8fff
-	MaxCount      uint16  = 0xffff
+	LuxCoefD float64 = 0.86
+
+	// MaxCount100ms sensor count
+	MaxCount100ms uint16 = 0x8fff
+
+	// MaxCount sensor count
+	MaxCount uint16 = 0xffff
 )
 
 // Register maps
