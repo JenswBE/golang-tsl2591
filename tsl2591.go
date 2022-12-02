@@ -11,13 +11,16 @@ import (
 	"fmt"
 	"math"
 
-	"periph.io/x/periph/conn/i2c"
-	"periph.io/x/periph/conn/i2c/i2creg"
-	"periph.io/x/periph/host"
+	"periph.io/x/conn/v3/i2c"
+	"periph.io/x/conn/v3/i2c/i2creg"
+	"periph.io/x/host/v3"
 )
 
 // Opts holds various configuration options for the sensor
 type Opts struct {
+	// Bus name, alias or its number.
+	// See https://pkg.go.dev/periph.io/x/conn/v3/i2c/i2creg#Open for more info.
+	Bus    string
 	Gain   byte
 	Timing byte
 }
@@ -37,13 +40,13 @@ func NewTSL2591(opts *Opts) (*TSL2591, error) {
 
 	// Make sure periph is initialized.
 	if _, err := host.Init(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to init host: %w", err)
 	}
 
 	// Open the first available I²C bus:
-	bus, err := i2creg.Open("")
+	bus, err := i2creg.Open(opts.Bus)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to open I2C bus: %w", err)
 	}
 
 	// Address the device with address TSL2591_ADDR on the I²C bus:
@@ -56,7 +59,7 @@ func NewTSL2591(opts *Opts) (*TSL2591, error) {
 	write := []byte{CommandBit | RegisterDeviceID}
 	read := make([]byte, 1)
 	if err := tsl.dev.Tx(write, read); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to read device ID from I2C bus: %w", err)
 	}
 	if read[0] != 0x50 {
 		fmt.Printf("%v\n", read)
@@ -64,15 +67,15 @@ func NewTSL2591(opts *Opts) (*TSL2591, error) {
 	}
 
 	if err = tsl.SetTiming(opts.Timing); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to set timing: %w", err)
 	}
 
 	if err = tsl.SetGain(opts.Gain); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to set gain: %w", err)
 	}
 
 	if err = tsl.Enable(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to enable sensor: %w", err)
 	}
 
 	return tsl, nil
