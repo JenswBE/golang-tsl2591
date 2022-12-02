@@ -1,4 +1,4 @@
-module github.com/jimnelson2/tsl2591
+module github.com/JenswBE/golang-tsl2591
 
 go 1.17
 

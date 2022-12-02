@@ -9,7 +9,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/jimnelson2/tsl2591"
+	tsl2591 "github.com/JenswBE/golang-tsl2591"
 )
 
 const Interval = 1 * time.Second

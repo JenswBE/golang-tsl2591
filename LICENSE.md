@@ -1,5 +1,6 @@
 MIT License
 
+Copyright (c) [2022] [github.com/jimnelson2/tsl2591]
 Copyright (c) [2020] [github.com/jimnelson2/tsl2591]
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
