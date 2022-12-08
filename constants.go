@@ -14,6 +14,9 @@ const (
 	// Addr is the default I2C address for the TSL2591
 	Addr uint16 = 0x29
 
+	// Device ID of the TSL2591 chip
+	DeviceID byte = 0x50
+
 	// CommandBits is 1010 0000 - sets bits 7 and 5 to indicate 'command normal'
 	CommandBit byte = 0xa0
 
@@ -120,89 +123,95 @@ const (
 	RegisterChan1High byte = 0x17
 )
 
+type IntegrationTime byte
+
 // Constants for sensor integration timing
 const (
-	// Integrationtime100MS is 100 millis
-	Integrationtime100MS byte = 0x00
+	// IntegrationTime100MS is 100 millis
+	IntegrationTime100MS IntegrationTime = 0x00
 
-	// Integrationtime200MS is 200 millis
-	Integrationtime200MS byte = 0x01
+	// IntegrationTime200MS is 200 millis
+	IntegrationTime200MS IntegrationTime = 0x01
 
-	// Integrationtime300MS is 300 millis
-	Integrationtime300MS byte = 0x02
+	// IntegrationTime300MS is 300 millis
+	IntegrationTime300MS IntegrationTime = 0x02
 
-	// Integrationtime400MS is 400 millis
-	Integrationtime400MS byte = 0x03
+	// IntegrationTime400MS is 400 millis
+	IntegrationTime400MS IntegrationTime = 0x03
 
-	// Integrationtime500MS is 500 millis
-	Integrationtime500MS byte = 0x04
+	// IntegrationTime500MS is 500 millis
+	IntegrationTime500MS IntegrationTime = 0x04
 
-	// Integrationtime600MS is 600 millis
-	Integrationtime600MS byte = 0x05
+	// IntegrationTime600MS is 600 millis
+	IntegrationTime600MS IntegrationTime = 0x05
 )
+
+type Persist byte
 
 // Constants for adjusting the persistance filter
 const (
 	// PersistEvery is every ALS cycle generates an interrupt
-	PersistEvery byte = 0x00
+	PersistEvery Persist = 0x00
 
 	// PersistAny for any value outside of threshold range
-	PersistAny byte = 0x01
+	PersistAny Persist = 0x01
 
 	// Persist2 for 2 consecutive values out of range
-	Persist2 byte = 0x02
+	Persist2 Persist = 0x02
 
 	// Persist3 for 3 consecutive values out of range
-	Persist3 byte = 0x03
+	Persist3 Persist = 0x03
 
 	// Persist5 for 5 consecutive values out of range
-	Persist5 byte = 0x04
+	Persist5 Persist = 0x04
 
 	// Persist10 for 10 consecutive values out of range
-	Persist10 byte = 0x05
+	Persist10 Persist = 0x05
 
 	// Persist15 for 15 consecutive values out of range
-	Persist15 byte = 0x06
+	Persist15 Persist = 0x06
 
 	// Persist20 for 20 consecutive values out of range
-	Persist20 byte = 0x07
+	Persist20 Persist = 0x07
 
 	// Persist25 for 25 consecutive values out of range
-	Persist25 byte = 0x08
+	Persist25 Persist = 0x08
 
 	// Persist30 for 30 consecutive values out of range
-	Persist30 byte = 0x09
+	Persist30 Persist = 0x09
 
 	// Persist35 for 35 consecutive values out of range
-	Persist35 byte = 0x0a
+	Persist35 Persist = 0x0a
 
 	// Persist40 for 40 consecutive values out of range
-	Persist40 byte = 0x0b
+	Persist40 Persist = 0x0b
 
 	// Persist45 for 45 consecutive values out of range
-	Persist45 byte = 0x0c
+	Persist45 Persist = 0x0c
 
 	// Persist50 for 50 consecutive values out of range
-	Persist50 byte = 0x0d
+	Persist50 Persist = 0x0d
 
 	// Persist55 for 55 consecutive values out of range
-	Persist55 byte = 0x0e
+	Persist55 Persist = 0x0e
 
 	// Persist60 for 60 consecutive values out of range
-	Persist60 byte = 0x0f
+	Persist60 Persist = 0x0f
 )
+
+type Gain byte
 
 // Constants for adjusting the sensor gain
 const (
 	// GainLow is low gain (1x)
-	GainLow byte = 0x00
+	GainLow Gain = 0x00
 
 	// GainMed is medium gain (25x)
-	GainMed byte = 0x10
+	GainMed Gain = 0x10
 
 	// GainHigh is high gain (428x)
-	GainHigh byte = 0x20
+	GainHigh Gain = 0x20
 
 	// GainMax is max gain (9876x)
-	GainMax byte = 0x30
+	GainMax Gain = 0x30
 )

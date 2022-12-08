@@ -6,7 +6,6 @@
 package tsl2591
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -21,57 +20,59 @@ type Opts struct {
 	// Bus name, alias or its number.
 	// See https://pkg.go.dev/periph.io/x/conn/v3/i2c/i2creg#Open for more info.
 	Bus    string
-	Gain   byte
-	Timing byte
+	Gain   Gain
+	Timing IntegrationTime
+}
+
+func DefaultOptions() Opts {
+	return Opts{
+		Bus:    "",
+		Gain:   GainMed,
+		Timing: IntegrationTime100MS,
+	}
 }
 
 // TSL2591 holds board setup detail
 type TSL2591 struct {
-	enabled bool
-	timing  byte
-	gain    byte
-	dev     i2c.Dev
+	dev    i2c.Dev
+	gain   Gain
+	timing IntegrationTime
 }
 
 // NewTSL2591 sets up a TSL2591 chip via the I2C protocol, sets its gain and timing
 // attributes, and returns an error if any occurred in that process or if the
 // TSL2591 was not found
 func NewTSL2591(opts *Opts) (*TSL2591, error) {
-
 	// Make sure periph is initialized.
 	if _, err := host.Init(); err != nil {
 		return nil, fmt.Errorf("unable to init host: %w", err)
 	}
 
-	// Open the first available I²C bus:
+	// Open the first available I2C bus:
 	bus, err := i2creg.Open(opts.Bus)
 	if err != nil {
 		return nil, fmt.Errorf("unable to open I2C bus: %w", err)
 	}
 
-	// Address the device with address TSL2591_ADDR on the I²C bus:
+	// Address the device with address TSL2591_ADDR on the I2C bus:
 	dev := i2c.Dev{Addr: Addr, Bus: bus}
-	tsl := &TSL2591{
-		dev: dev,
-	}
+	tsl := &TSL2591{dev: dev}
 
-	// Read the device ID from the TSL2591. It should be 0x50
-	write := []byte{CommandBit | RegisterDeviceID}
-	read := make([]byte, 1)
-	if err := tsl.dev.Tx(write, read); err != nil {
+	// Read the device ID from the TSL2591. It should be 0x50.
+	deviceID, err := tsl.readU8(RegisterDeviceID)
+	if err != nil {
 		return nil, fmt.Errorf("unable to read device ID from I2C bus: %w", err)
 	}
-	if read[0] != 0x50 {
-		fmt.Printf("%v\n", read)
-		return nil, errors.New("can't find a TSL2591 on I2C bus")
-	}
-
-	if err = tsl.SetTiming(opts.Timing); err != nil {
-		return nil, fmt.Errorf("unable to set timing: %w", err)
+	if deviceID != DeviceID {
+		return nil, fmt.Errorf("received device ID %x does not match expected device ID %x", deviceID, DeviceID)
 	}
 
 	if err = tsl.SetGain(opts.Gain); err != nil {
 		return nil, fmt.Errorf("unable to set gain: %w", err)
+	}
+
+	if err = tsl.SetTiming(opts.Timing); err != nil {
+		return nil, fmt.Errorf("unable to set timing: %w", err)
 	}
 
 	if err = tsl.Enable(); err != nil {
@@ -83,80 +84,60 @@ func NewTSL2591(opts *Opts) (*TSL2591, error) {
 
 // Enable enables the TSL2591 chip
 func (tsl *TSL2591) Enable() error {
-
-	write := []byte{CommandBit | RegisterEnable |
-		EnablePowerOn | EnableAEN | EnableAIEN | EnableNPIEN}
-	if _, err := tsl.dev.Write(write); err != nil {
-		return err
+	err := tsl.writeU8(RegisterEnable, EnablePowerOn|EnableAEN|EnableAIEN|EnableNPIEN)
+	if err != nil {
+		return fmt.Errorf("failed to enable sensor: %w", err)
 	}
-
-	tsl.enabled = true
 	return nil
 }
 
 // Disable disables the TSL2591 chip
 func (tsl *TSL2591) Disable() error {
-
-	write := []byte{CommandBit | RegisterEnable | EnablePowerOff}
-	if _, err := tsl.dev.Write(write); err != nil {
-		return err
+	err := tsl.writeU8(RegisterEnable, EnablePowerOff)
+	if err != nil {
+		return fmt.Errorf("failed to disable sensor: %w", err)
 	}
-
-	tsl.enabled = false
 	return nil
-
 }
 
-// SetGain sets TSL2591 gain. Chip is enabled, gain set, then disabled
-func (tsl *TSL2591) SetGain(gain byte) error {
-
-	if err := tsl.Enable(); err != nil {
-		return err
+// SetGain sets TSL2591 gain
+func (tsl *TSL2591) SetGain(gain Gain) error {
+	// Get control
+	control, err := tsl.readU8(RegisterControl)
+	if err != nil {
+		return fmt.Errorf("failed to read current sensor control: %w", err)
 	}
 
-	write := []byte{CommandBit | RegisterEnable | tsl.timing | gain}
-	if _, err := tsl.dev.Write(write); err != nil {
-		return err
-	}
+	// Update control
+	control &= 0b11001111
+	control |= byte(gain)
 
-	if err := tsl.Disable(); err != nil {
-		return err
+	// Write control
+	if err = tsl.writeU8(RegisterControl, control); err != nil {
+		return fmt.Errorf("failed to write sensor control: %w", err)
 	}
-
 	tsl.gain = gain
-
 	return nil
 }
 
 // SetTiming sets TSL2591 timing. Chip is enabled, timing set, then disabled
-func (tsl *TSL2591) SetTiming(timing byte) error {
-
-	if err := tsl.Enable(); err != nil {
-		return err
+func (tsl *TSL2591) SetTiming(timing IntegrationTime) error {
+	// Get control
+	control, err := tsl.readU8(RegisterControl)
+	if err != nil {
+		return fmt.Errorf("failed to read current sensor control: %w", err)
 	}
 
-	write := []byte{CommandBit | RegisterEnable | tsl.gain | timing}
-	if _, err := tsl.dev.Write(write); err != nil {
-		return err
-	}
+	// Update control
+	control &= 0b11111000
+	control |= byte(timing)
 
-	if err := tsl.Disable(); err != nil {
-		return err
+	// Write control
+	if err = tsl.writeU8(RegisterControl, control); err != nil {
+		return fmt.Errorf("failed to write sensor control: %w", err)
 	}
-
 	tsl.timing = timing
-
 	return nil
-}
-
-// readU16 reads a 16-bit little-endian unsigned value from the specified 8-bit address
-func (tsl *TSL2591) readU16(address byte) (uint16, error) {
-	readBuffer := make([]byte, 2)
-	cmd := []byte{CommandBit | address}
-	if err := tsl.dev.Tx(cmd, readBuffer); err != nil {
-		return 0, fmt.Errorf("failed to read uint16: %w", err)
-	}
-	return binary.LittleEndian.Uint16(readBuffer), nil
 }
 
 // RawLuminosity reads from the sensor
@@ -181,14 +162,11 @@ func (tsl *TSL2591) RawLuminosity() (uint16, uint16, error) {
 func (tsl *TSL2591) FullSpectrum() (uint32, error) {
 	// Full spectrum (IR + visible) light and return its value
 	// as a 32-bit unsigned number
-
 	c0, c1, err := tsl.RawLuminosity()
 	if err != nil {
 		return 0, err
 	}
-
 	return uint32(c1)<<16 | uint32(c0), nil
-
 }
 
 // Infrared returns infrared value
@@ -223,7 +201,7 @@ func (tsl *TSL2591) Lux() (float64, error) {
 
 	// Set the maximum sensor counts based on the integration time (atime) setting
 	var maxCounts uint16
-	if tsl.timing == Integrationtime100MS {
+	if tsl.timing == IntegrationTime100MS {
 		maxCounts = MaxCount100ms
 	} else {
 		maxCounts = MaxCount
@@ -235,8 +213,10 @@ func (tsl *TSL2591) Lux() (float64, error) {
 	}
 
 	// Calculate lux
-	again := uint16(1)
+	var again uint16
 	switch tsl.gain {
+	case GainLow:
+		again = 1
 	case GainMed:
 		again = 25
 	case GainHigh:
