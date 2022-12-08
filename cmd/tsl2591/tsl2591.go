@@ -5,6 +5,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"time"
@@ -15,11 +16,12 @@ import (
 const Interval = 1 * time.Second
 
 func main() {
+	bus := flag.String("bus", "", "Name of the bus")
+	flag.Parse()
 
-	tsl, err := tsl2591.NewTSL2591(&tsl2591.Opts{
-		Gain:   tsl2591.GainMed,
-		Timing: tsl2591.Integrationtime600MS,
-	})
+	opts := tsl2591.DefaultOptions()
+	opts.Bus = *bus
+	tsl, err := tsl2591.NewTSL2591(opts)
 	if err != nil {
 		panic(err)
 	}
@@ -51,6 +53,14 @@ func main() {
 			log.Panic(err)
 		}
 		fmt.Printf("Full spectrum (IR + visible) light: %d\n", full)
+
+		chan0, chan1, err := tsl.RawLuminosity()
+		if err != nil {
+			log.Panic(err)
+		}
+		fmt.Printf("Raw luminosity: %b (chan0), %b (chan1)\n", chan0, chan1)
+
+		fmt.Println()
 
 		<-ticker.C
 	}
