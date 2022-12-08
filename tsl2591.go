@@ -24,8 +24,8 @@ type Opts struct {
 	Timing IntegrationTime
 }
 
-func DefaultOptions() Opts {
-	return Opts{
+func DefaultOptions() *Opts {
+	return &Opts{
 		Bus:    "",
 		Gain:   GainMed,
 		Timing: IntegrationTime100MS,
@@ -43,6 +43,11 @@ type TSL2591 struct {
 // attributes, and returns an error if any occurred in that process or if the
 // TSL2591 was not found
 func NewTSL2591(opts *Opts) (*TSL2591, error) {
+	// Use default opts if not set
+	if opts == nil {
+		opts = DefaultOptions()
+	}
+
 	// Make sure periph is initialized.
 	if _, err := host.Init(); err != nil {
 		return nil, fmt.Errorf("unable to init host: %w", err)
