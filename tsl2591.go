@@ -154,7 +154,7 @@ func (tsl *TSL2591) readU16(address byte) (uint16, error) {
 	readBuffer := make([]byte, 2)
 	cmd := []byte{CommandBit | address}
 	if err := tsl.dev.Tx(cmd, readBuffer); err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to read uint16: %w", err)
 	}
 	return binary.LittleEndian.Uint16(readBuffer), nil
 }
@@ -166,12 +166,12 @@ func (tsl *TSL2591) RawLuminosity() (uint16, uint16, error) {
 	// are 16-bit unsigned numbers (0-65535)
 	c0, err := tsl.readU16(RegisterChan0Low)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("failed to read channel 0 of raw luminosity: %w", err)
 	}
 
 	c1, err := tsl.readU16(RegisterChan1Low)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("failed to read channel 1 of raw luminosity: %w", err)
 	}
 
 	return c0, c1, nil
@@ -184,7 +184,7 @@ func (tsl *TSL2591) FullSpectrum() (uint32, error) {
 
 	c0, c1, err := tsl.RawLuminosity()
 	if err != nil {
-		return 0, nil
+		return 0, err
 	}
 
 	return uint32(c1)<<16 | uint32(c0), nil
@@ -195,18 +195,18 @@ func (tsl *TSL2591) FullSpectrum() (uint32, error) {
 func (tsl *TSL2591) Infrared() (uint16, error) {
 	_, c1, err := tsl.RawLuminosity()
 	if err != nil {
-		return 0, nil
+		return 0, err
 	}
 	return c1, nil
 }
 
 // Visible returns visible value
 func (tsl *TSL2591) Visible() (uint32, error) {
-	_, c1, err := tsl.RawLuminosity()
+	c0, c1, err := tsl.RawLuminosity()
 	if err != nil {
-		return 0, nil
+		return 0, err
 	}
-	full := uint32(c1)<<16 | uint32(c1)
+	full := uint32(c1)<<16 | uint32(c0)
 	return full - uint32(c1), nil
 }
 
@@ -215,7 +215,7 @@ func (tsl *TSL2591) Lux() (float64, error) {
 
 	c0, c1, err := tsl.RawLuminosity()
 	if err != nil {
-		return 0, nil
+		return 0, err
 	}
 
 	// Compute the atime in milliseconds
