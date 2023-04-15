@@ -1,4 +1,4 @@
-//Package tsl2591 interacts with TSL2591 lux sensors
+// Package tsl2591 interacts with TSL2591 lux sensors
 //
 // Heavily inspired by https://github.com/mstahl/tsl2591
 // and https://github.com/adafruit/Adafruit_TSL2591_Library/
@@ -6,7 +6,6 @@
 package tsl2591
 
 import (
-	"errors"
 	"fmt"
 	"math"
 
@@ -69,7 +68,7 @@ func NewTSL2591(opts *Opts) (*TSL2591, error) {
 		return nil, fmt.Errorf("unable to read device ID from I2C bus: %w", err)
 	}
 	if deviceID != DeviceID {
-		return nil, fmt.Errorf("received device ID %x does not match expected device ID %x", deviceID, DeviceID)
+		return nil, UnexpectedDeviceIDError{Actual: deviceID, Expected: DeviceID}
 	}
 
 	if err = tsl.SetGain(opts.Gain); err != nil {
@@ -195,7 +194,6 @@ func (tsl *TSL2591) Visible() (uint32, error) {
 
 // Lux calculates a lux value from both the infrared and visible channels
 func (tsl *TSL2591) Lux() (float64, error) {
-
 	c0, c1, err := tsl.RawLuminosity()
 	if err != nil {
 		return 0, err
@@ -214,7 +212,7 @@ func (tsl *TSL2591) Lux() (float64, error) {
 
 	// Handle overflow.
 	if c0 >= maxCounts || c1 >= maxCounts {
-		return 0, errors.New("overflow reading light channels")
+		return 0, ErrOverflow
 	}
 
 	// Calculate lux

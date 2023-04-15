@@ -1,0 +1,27 @@
+name: Test, build and publish Golang services
+on:
+  push:
+  pull_request:
+
+env:
+  GO_VERSION: "1.20"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+
+      - name: Pull common linter configs
+        run: wget -O .golangci.yml https://raw.githubusercontent.com/JenswBE/setup/main/programming_configs/golang/.golangci.yml
+
+      - name: Lint service
+        uses: golangci/golangci-lint-action@v3
+        with:
+          args: --timeout=5m

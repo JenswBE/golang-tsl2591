@@ -148,7 +148,7 @@ const (
 
 type Persist byte
 
-// Constants for adjusting the persistance filter
+// Constants for adjusting the persistence filter
 const (
 	// PersistEvery is every ALS cycle generates an interrupt
 	PersistEvery Persist = 0x00

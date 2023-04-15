@@ -1,12 +1,9 @@
-/**
- * tsl2591 - A command for interacting with TSL2591 lux sensors.
- */
+// tsl2591 - A command for interacting with TSL2591 lux sensors.
 
 package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"time"
 
@@ -23,9 +20,13 @@ func main() {
 	opts.Bus = *bus
 	tsl, err := tsl2591.NewTSL2591(opts)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
-	defer tsl.Disable()
+	defer func() {
+		if disableErr := tsl.Disable(); disableErr != nil {
+			log.Panic(err)
+		}
+	}()
 
 	ticker := time.NewTicker(Interval)
 
@@ -34,35 +35,32 @@ func main() {
 		if err != nil {
 			log.Panic(err)
 		}
-		fmt.Printf("Total Light: %f lux\n", lux)
+		log.Printf("Total Light: %f lux\n", lux)
 
 		ir, err := tsl.Infrared()
 		if err != nil {
 			log.Panic(err)
 		}
-		fmt.Printf("Infrared light: %d\n", ir)
+		log.Printf("Infrared light: %d\n", ir)
 
 		visible, err := tsl.Visible()
 		if err != nil {
 			log.Panic(err)
 		}
-		fmt.Printf("Visible light: %d\n", visible)
+		log.Printf("Visible light: %d\n", visible)
 
 		full, err := tsl.FullSpectrum()
 		if err != nil {
 			log.Panic(err)
 		}
-		fmt.Printf("Full spectrum (IR + visible) light: %d\n", full)
+		log.Printf("Full spectrum (IR + visible) light: %d\n", full)
 
 		chan0, chan1, err := tsl.RawLuminosity()
 		if err != nil {
 			log.Panic(err)
 		}
-		fmt.Printf("Raw luminosity: %b (chan0), %b (chan1)\n", chan0, chan1)
-
-		fmt.Println()
+		log.Printf("Raw luminosity: %b (chan0), %b (chan1)\n\n", chan0, chan1)
 
 		<-ticker.C
 	}
-
 }
